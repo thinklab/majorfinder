@@ -1,0 +1,11 @@
+[project]
+name = "majorfinder"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "ipykernel>=7.1.0",
+    "notebook>=7.4.7",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+]
