@@ -9,10 +9,13 @@
     :root { color-scheme: light dark; }
     body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px; max-width: 1200px; margin: auto; padding: 20px;}
     .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+    .controls-group { display: flex; align-items: center; gap: 8px; background: #f0f0f0; padding: 5px 15px; border-radius: 20px; border: 1px solid #ddd;}
+    .controls-group label { font-size: 0.9rem; font-weight: bold; color: #555;}
     select{padding:8px 12px; min-width: 300px; border-radius: 4px; border: 1px solid #ccc;}
-    #chart{width:100%;height:500px; background: #f9f9f9; border-radius: 8px; margin-bottom: 20px;}
-    .stats-container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;}
-    .stat-card { background: #eee; padding: 15px 25px; border-radius: 8px; flex: 1; min-width: 200px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+    #chart, #rpy-chart{width:100%;height:500px; background: #f9f9f9; border-radius: 8px; margin-bottom: 20px;}
+    #rpy-chart { height: 300px; }
+    .stats-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;}
+    .stat-card { background: #eee; padding: 10px 15px; border-radius: 8px; flex: 1; min-width: 150px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
     .stat-card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #555; text-transform: uppercase; display: flex; align-items: center; gap: 5px;}
     .stat-card .value { font-size: 1.5rem; font-weight: bold;}
     .info-icon { 
@@ -59,7 +62,7 @@
         <div id="stat-rpy" class="value">---</div>
     </div>
     <div class="stat-card">
-        <h3>Median Earnings (1-Year)</h3>
+        <h3>Median Earn (1-Year)</h3>
         <div id="stat-earn" class="value">---</div>
     </div>
     <div class="stat-card">
@@ -79,6 +82,7 @@
   </div>
 
   <div id="chart"></div>
+  <div id="rpy-chart"></div>
   
   <p class="note">
     <b>Data Note:</b> Earnings distribution shows the frequency of median earnings across different institutions for the selected major. 
@@ -208,26 +212,29 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const payload = (majorPayloads || {})[credVal === '__ALL__' ? '__ALL__' : Number(credVal)] || null;
 
-    if (!payload) {
+    const view = (payload && payload['all']) ? payload['all'] : null;
+
+    if (!payload || !view) {
       document.getElementById('stat-debt').innerText = 'N/A';
       document.getElementById('stat-rpy').innerText = 'N/A';
       document.getElementById('stat-earn').innerText = 'N/A';
       document.getElementById('stat-ratio').innerText = 'N/A';
       document.getElementById('stat-cost').innerText = 'N/A';
       Plotly.newPlot('chart', [], {title: 'No data for this selection'});
+      Plotly.newPlot('rpy-chart', [], {title: 'No repayment data'});
       return;
     }
 
     // Update Cards
-    document.getElementById('stat-debt').innerText = payload.debt_mdn ? '$' + payload.debt_mdn.toLocaleString() : 'N/A';
+    document.getElementById('stat-debt').innerText = view.debt_mdn ? '$' + view.debt_mdn.toLocaleString() : 'N/A';
     document.getElementById('stat-rpy').innerText = payload.rpy_3yr_rt ? (payload.rpy_3yr_rt * 100).toFixed(1) + '%' : 'N/A';
-    document.getElementById('stat-earn').innerText = (payload.earn_pcts && payload.earn_pcts.p50) ? '$' + payload.earn_pcts.p50.toLocaleString() : 'N/A';
-    document.getElementById('stat-ratio').innerText = payload.earn_to_debt_ratio ? payload.earn_to_debt_ratio.toFixed(2) : 'N/A';
+    document.getElementById('stat-earn').innerText = (view.earn_pcts && view.earn_pcts.p50) ? '$' + view.earn_pcts.p50.toLocaleString() : 'N/A';
+    document.getElementById('stat-ratio').innerText = view.earn_to_debt_ratio ? view.earn_to_debt_ratio.toFixed(2) : 'N/A';
     document.getElementById('stat-cost').innerText = payload.cost_avg ? '$' + payload.cost_avg.toLocaleString() : 'N/A';
 
     // Update Chart
-    const bins = payload.earn_bins || [];
-    const p = payload.earn_pcts || {};
+    const bins = view.earn_bins || [];
+    const p = view.earn_pcts || {};
     
     if (bins.length === 0) {
         Plotly.newPlot('chart', [], {title: 'No earnings distribution data'});
@@ -280,6 +287,55 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     Plotly.newPlot('chart', [barTrace], layout, {displayModeBar:true, responsive:true});
+
+    // Update Repayment Chart
+    const rpyTraces = [];
+    ['rpy1', 'rpy4'].forEach((key, idx) => {
+        const rData = payload[key];
+        if (!rData) return;
+        const d = rData.dist;
+        const x = [idx === 0 ? '1-Year' : '4-Year'];
+        
+        rpyTraces.push({
+            name: 'Paid / Progress',
+            type: 'bar', x: x, y: [d.paid_prog * 100], orientation: 'v',
+            marker: {color: '#2ca02c'}, showlegend: idx === 0
+        });
+        rpyTraces.push({
+            name: 'Other / Waiting',
+            type: 'bar', x: x, y: [d.other * 100], orientation: 'v',
+            marker: {color: '#ffbb78'}, showlegend: idx === 0
+        });
+        rpyTraces.push({
+            name: 'Default / Delinq',
+            type: 'bar', x: x, y: [d.default_delinq * 100], orientation: 'v',
+            marker: {color: '#d62728'}, showlegend: idx === 0
+        });
+    });
+
+    const rpyLayout = {
+      title: 'Repayment Status (1-Year vs 4-Year)',
+      barmode: 'stack',
+      yaxis: {title: 'Percentage (%)', range: [0, 100]},
+      xaxis: {title: 'Cohort Year'},
+      margin: {l:60,r:20,t:60,b:60},
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      height: 300
+    };
+
+    if (rpyTraces.length > 0) {
+        // Group traces by name to avoid legend duplication
+        const groupedTraces = {};
+        rpyTraces.forEach(t => {
+            if(!groupedTraces[t.name]) groupedTraces[t.name] = { ...t, x: [], y: [] };
+            groupedTraces[t.name].x.push(t.x[0]);
+            groupedTraces[t.name].y.push(t.y[0]);
+        });
+        Plotly.newPlot('rpy-chart', Object.values(groupedTraces), rpyLayout, {responsive:true});
+    } else {
+        Plotly.newPlot('rpy-chart', [], {title: 'No repayment breakdown data'});
+    }
   }
 
   document.getElementById('major').addEventListener('change', render);

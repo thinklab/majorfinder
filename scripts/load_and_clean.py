@@ -47,6 +47,8 @@ fostudy_cols = [
     # Male / NotMale earnings
     "EARN_MALE_WNE_MDN_1YR",
     "EARN_NOMALE_WNE_MDN_1YR",
+    "DEBT_MALE_STGP_ANY_MDN",
+    "DEBT_NOTMALE_STGP_ANY_MDN",
     # Debt fields
     "DEBT_ALL_STGP_ANY_MDN",
     "DEBT_ALL_PP_ANY_MDN",
@@ -54,6 +56,18 @@ fostudy_cols = [
     # Repayment components
     "BBRR1_FED_COMP_N",
     "BBRR1_FED_COMP_PAIDINFULL",
+    "BBRR1_FED_COMP_MAKEPROG",
+    "BBRR1_FED_COMP_DFLT",
+    "BBRR1_FED_COMP_DLNQ",
+    "BBRR1_FED_COMP_FBR",
+    "BBRR1_FED_COMP_DFR",
+    "BBRR4_FED_COMP_N",
+    "BBRR4_FED_COMP_PAIDINFULL",
+    "BBRR4_FED_COMP_MAKEPROG",
+    "BBRR4_FED_COMP_DFLT",
+    "BBRR4_FED_COMP_DLNQ",
+    "BBRR4_FED_COMP_FBR",
+    "BBRR4_FED_COMP_DFR",
 ]
 
 

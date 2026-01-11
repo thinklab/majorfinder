@@ -25,6 +25,11 @@ The project utilizes data from the [College Scorecard](https://collegescorecard.
 3.  **Visualization**: `docs/index.html`
     - A static HTML dashboard using Plotly.js to visualize the processed data.
 
+## Live Demo
+
+The dashboard is automatically deployed to GitHub Pages:
+[View Live Dashboard](https://thinklab.github.io/majorfinder/)
+
 ## How to Run & Deploy
 
 To keep the repository clean and minimize CI usage, data processing is performed locally.
