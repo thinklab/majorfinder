@@ -13,8 +13,21 @@
     #chart{width:100%;height:500px; background: #f9f9f9; border-radius: 8px; margin-bottom: 20px;}
     .stats-container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;}
     .stat-card { background: #eee; padding: 15px 25px; border-radius: 8px; flex: 1; min-width: 200px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
-    .stat-card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #555; text-transform: uppercase;}
+    .stat-card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #555; text-transform: uppercase; display: flex; align-items: center; gap: 5px;}
     .stat-card .value { font-size: 1.5rem; font-weight: bold;}
+    .info-icon { 
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 50%; background: #ccc; 
+      color: #fff; font-size: 10px; cursor: help; font-weight: bold;
+    }
+    .tooltip { position: relative; display: inline-block; }
+    .tooltip .tooltiptext {
+      visibility: hidden; width: 200px; background-color: #555; color: #fff;
+      text-align: center; border-radius: 6px; padding: 10px; position: absolute;
+      z-index: 1; bottom: 125%; left: 50%; margin-left: -100px; opacity: 0;
+      transition: opacity 0.3s; font-size: 0.8rem; text-transform: none; font-weight: normal;
+    }
+    .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
     .note{color:#777;font-size:0.9rem; margin-top: 20px;}
     [data-theme="dark"] .stat-card { background: #333; }
     [data-theme="dark"] .stat-card h3 { color: #aaa; }
@@ -48,6 +61,20 @@
     <div class="stat-card">
         <h3>Median Earnings (1-Year)</h3>
         <div id="stat-earn" class="value">---</div>
+    </div>
+    <div class="stat-card">
+        <h3>
+          Earnings-to-Debt Ratio
+          <span class="tooltip">
+            <span class="info-icon">i</span>
+            <span class="tooltiptext">How many dollars you earn in your first year for every dollar of student debt. Higher is better.</span>
+          </span>
+        </h3>
+        <div id="stat-ratio" class="value">---</div>
+    </div>
+    <div class="stat-card">
+        <h3>Avg Annual Cost</h3>
+        <div id="stat-cost" class="value">---</div>
     </div>
   </div>
 
@@ -185,6 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('stat-debt').innerText = 'N/A';
       document.getElementById('stat-rpy').innerText = 'N/A';
       document.getElementById('stat-earn').innerText = 'N/A';
+      document.getElementById('stat-ratio').innerText = 'N/A';
+      document.getElementById('stat-cost').innerText = 'N/A';
       Plotly.newPlot('chart', [], {title: 'No data for this selection'});
       return;
     }
@@ -193,6 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('stat-debt').innerText = payload.debt_mdn ? '$' + payload.debt_mdn.toLocaleString() : 'N/A';
     document.getElementById('stat-rpy').innerText = payload.rpy_3yr_rt ? (payload.rpy_3yr_rt * 100).toFixed(1) + '%' : 'N/A';
     document.getElementById('stat-earn').innerText = (payload.earn_pcts && payload.earn_pcts.p50) ? '$' + payload.earn_pcts.p50.toLocaleString() : 'N/A';
+    document.getElementById('stat-ratio').innerText = payload.earn_to_debt_ratio ? payload.earn_to_debt_ratio.toFixed(2) : 'N/A';
+    document.getElementById('stat-cost').innerText = payload.cost_avg ? '$' + payload.cost_avg.toLocaleString() : 'N/A';
 
     // Update Chart
     const bins = payload.earn_bins || [];

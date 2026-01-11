@@ -55,6 +55,7 @@ def to_payload(df_slice, bins=50):
     earn = pd.to_numeric(df_slice["EARN_MDN_1YR"], errors="coerce").dropna()
     debt = pd.to_numeric(df_slice["DEBT_ALL_STGP_ANY_MDN"], errors="coerce").dropna()
     rpy = pd.to_numeric(df_slice["RPY_3YR_RT"], errors="coerce").dropna()
+    cost = pd.to_numeric(df_slice["COSTT4_A"], errors="coerce").dropna()
 
     # If we don't have the primary outcomes, skip this slice to avoid N/A in dashboard
     if earn.empty and debt.empty and rpy.empty:
@@ -82,6 +83,21 @@ def to_payload(df_slice, bins=50):
 
     if not rpy.empty:
         payload["rpy_3yr_rt"] = round(float(rpy.mean()), 4)
+
+    if not cost.empty:
+        payload["cost_avg"] = round(float(cost.mean()), 2)
+
+    if not earn.empty and not debt.empty:
+        # Calculate individual ratios then take median to avoid skew by outlier schools
+        # or just take ratio of medians? Ratio of medians is more common for this high-level view.
+        # But individual ratios median is better.
+        common_idx = earn.index.intersection(debt.index)
+        if not common_idx.empty:
+            ratios = earn.loc[common_idx] / debt.loc[common_idx]
+            # Handle cases where debt might be 0 to avoid inf
+            ratios = ratios.replace([np.inf, -np.inf], np.nan).dropna()
+            if not ratios.empty:
+                payload["earn_to_debt_ratio"] = round(float(ratios.median()), 4)
 
     return payload
 
