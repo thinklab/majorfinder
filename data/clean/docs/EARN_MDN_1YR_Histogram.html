@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Major outcomes — EARN_MDN_1YR</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:16px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+    select{padding:6px 8px; min-width: 260px}
+    #chart{max-width:1000px;width:100%;height:520px}
+    .note{color:#777;font-size:0.9rem}
+  </style>
+</head>
+<body>
+  <h1>EARN_MDN_1YR histogram (picker)</h1>
+  <div class="row">
+    <label>Major:
+      <select id="major"></select>
+    </label>
+    <label>CREDLEV:
+      <select id="cred"></select>
+    </label>
+  </div>
+  <div id="chart"></div>
+  <p class="note">Percentile lines: p10, p25, median (red), p75, p90.</p>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  let DATA = { majors: [], credlevs: [], payload: {} };
+
+  async function loadData() {
+    const url = 'data.json'; // if your HTML is in docs/, and data.json is also in docs/, this is correct
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
+    DATA = await res.json();
+  }
+
+  function populateSelectors() {
+    const majorSel = document.getElementById('major');
+    const credSel  = document.getElementById('cred');
+    majorSel.innerHTML = '';
+    credSel.innerHTML = '';
+
+    const majors = Array.isArray(DATA.majors) ? DATA.majors : [];
+    const credlevs = Array.isArray(DATA.credlevs) ? DATA.credlevs : [];
+    const hasCred = credlevs.length > 0;
+
+    majors.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m; o.text = m;
+      majorSel.add(o);
+    });
+
+    if (hasCred) {
+      credlevs.forEach(c => {
+        const o = document.createElement('option');
+        o.value = String(c); o.text = String(c);
+        credSel.add(o);
+      });
+    } else {
+      const o = document.createElement('option');
+      o.value = '__ALL__'; o.text = 'All';
+      credSel.add(o);
+    }
+
+    if (majors.length) majorSel.value = majors[0];
+    credSel.value = hasCred ? String(credlevs[0]) : '__ALL__';
+  }
+
+  function safeMax(arr, fallback) {
+    return (arr && arr.length) ? Math.max.apply(null, arr) : fallback;
+  }
+
+  function render() {
+    const majorSel = document.getElementById('major');
+    const credSel  = document.getElementById('cred');
+    const majors = DATA.majors || [];
+    const credlevs = DATA.credlevs || [];
+    const hasCred = credlevs.length > 0;
+
+    if (!majors.length) {
+      Plotly.newPlot('chart', [{type:'bar', x:[], y:[]}],
+        {title:'No data — ensure docs/data.json exists and path is correct'},
+        {responsive:true}
+      );
+      return;
+    }
+
+    const m = majorSel.value;
+    const credVal = hasCred ? Number(credSel.value) : null;
+    const payload = (DATA.payload[m] || {})[hasCred ? credVal : null] || {bins:[], pcts:{}};
+    const bins = payload.bins || [];
+    const p = payload.pcts || {};
+
+    const x0 = bins.map(b => b.x0);
+    const x1 = bins.map(b => b.x1);
+    const y  = bins.map(b => b.count);
+    const widths = x1.map((v,i) => Math.max((v - x0[i]), 1e-6));
+    const ymax = safeMax(y, 1);
+
+    const barTrace = {
+      type: 'bar',
+      x: x0,
+      y: y,
+      width: widths,
+      marker: {color: 'rgba(31,120,180,0.85)'},
+      hovertemplate: bins.length
+        ? 'Range: %{x:.0f} – %{customdata:.0f}<br>Count: %{y}<extra></extra>'
+        : 'No data<extra></extra>',
+      customdata: x1
+    };
+
+    const pctDefs = [
+      {k:'p10', color:'#888', dash:'dot'},
+      {k:'p25', color:'#888', dash:'dot'},
+      {k:'p50', color:'crimson', dash:'solid'},
+      {k:'p75', color:'#888', dash:'dot'},
+      {k:'p90', color:'#888', dash:'dot'},
+    ].filter(d => p[d.k] != null && bins.length && y.some(v=>v>0));
+
+    const shapes = pctDefs.map(d => ({
+      type:'line', x0:p[d.k], x1:p[d.k], y0:0, y1:ymax,
+      line:{color:d.color, width:2, dash:d.dash}
+    }));
+
+    const annotations = pctDefs.map(d => ({
+      x:p[d.k], y:ymax, xanchor:'left', yanchor:'bottom',
+      text:d.k, showarrow:false, font:{color:d.color}
+    }));
+
+    const titleCred = hasCred ? credVal : 'All';
+    const layout = {
+      title: m + ' (CREDLEV=' + titleCred + ') — EARN_MDN_1YR',
+      bargap: 0.01,
+      xaxis: {title:'EARN_MDN_1YR'},
+      yaxis: {title:'Count'},
+      shapes, annotations,
+      margin: {l:60,r:20,t:60,b:60}
+    };
+
+    Plotly.newPlot('chart', [barTrace], layout, {displayModeBar:true, responsive:true});
+  }
+
+  // Wire events
+  document.getElementById('major').addEventListener('change', render);
+  document.getElementById('cred').addEventListener('change', render);
+
+  // Init sequence
+  (async () => {
+    try {
+      await loadData();      // fetch docs/data.json
+      populateSelectors();   // fill dropdowns
+      render();              // draw
+    } catch (e) {
+      console.error(e);
+      document.getElementById('chart').innerHTML = 'Could not load data.json';
+    }
+  })();
+});
+</script>
+</body>
+</html>
