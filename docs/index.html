@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Major Finder — Outcomes Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px; max-width: 1200px; margin: auto; padding: 20px;}
+    .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+    select{padding:8px 12px; min-width: 300px; border-radius: 4px; border: 1px solid #ccc;}
+    #chart{width:100%;height:500px; background: #f9f9f9; border-radius: 8px; margin-bottom: 20px;}
+    .stats-container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;}
+    .stat-card { background: #eee; padding: 15px 25px; border-radius: 8px; flex: 1; min-width: 200px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+    .stat-card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #555; text-transform: uppercase;}
+    .stat-card .value { font-size: 1.5rem; font-weight: bold;}
+    .note{color:#777;font-size:0.9rem; margin-top: 20px;}
+    [data-theme="dark"] .stat-card { background: #333; }
+    [data-theme="dark"] .stat-card h3 { color: #aaa; }
+    h1 { border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 30px;}
+  </style>
+</head>
+<body>
+  <h1>College Major Outcomes Dashboard</h1>
+  
+  <div class="row">
+    <label>Select Major:
+      <select id="major"></select>
+    </label>
+    <label>Degree Level (CREDLEV):
+      <select id="cred"></select>
+    </label>
+  </div>
+
+  <div class="stats-container">
+    <div class="stat-card">
+        <h3>Median Debt</h3>
+        <div id="stat-debt" class="value">---</div>
+    </div>
+    <div class="stat-card">
+        <h3>Repayment Rate (3-Year)</h3>
+        <div id="stat-rpy" class="value">---</div>
+    </div>
+    <div class="stat-card">
+        <h3>Median Earnings (1-Year)</h3>
+        <div id="stat-earn" class="value">---</div>
+    </div>
+  </div>
+
+  <div id="chart"></div>
+  
+  <p class="note">
+    <b>Data Note:</b> Earnings distribution shows the frequency of median earnings across different institutions for the selected major. 
+    Percentile lines: p10, p25, median (red), p75, p90.
+    <br>
+    <b>Degree Levels (CREDLEV):</b> 1: Certificate, 2: Associate's, 3: Bachelor's, 4: Post-baccalaureate, 5: Master's, 6: Doctoral, 7: First Professional, 8: Graduate Certificate.
+    <br><a href="about.html">Learn more about the data and processing</a>.
+  </p>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  let DATA = { majors: [], credlevs: [], payload: {} };
+
+  async function loadData() {
+    const res = await fetch('data.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to load data.json: ${res.status}`);
+    DATA = await res.json();
+  }
+
+  function getMajorData(majorName) {
+    return DATA.payload[majorName] || null;
+  }
+
+  function populateSelectors() {
+    const majorSel = document.getElementById('major');
+    const credSel  = document.getElementById('cred');
+    majorSel.innerHTML = '';
+    credSel.innerHTML = '<option value="__ALL__">All Levels</option>';
+
+    const majors = Array.isArray(DATA.majors) ? DATA.majors : [];
+    const credlevs = Array.isArray(DATA.credlevs) ? DATA.credlevs : [];
+
+    majors.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m; o.text = m;
+      majorSel.add(o);
+    });
+
+    credlevs.forEach(c => {
+      const o = document.createElement('option');
+      const names = {
+        1: 'Undergraduate Certificate',
+        2: 'Associate\'s Degree',
+        3: 'Bachelor\'s Degree',
+        4: 'Post-baccalaureate Certificate',
+        5: 'Master\'s Degree',
+        6: 'Doctoral Degree',
+        7: 'First Professional Degree',
+        8: 'Graduate/Professional Certificate'
+      };
+      o.value = String(c);
+      o.text = names[c] ? `${names[c]} (Level ${c})` : `Level ${c}`;
+      credSel.add(o);
+    });
+
+    if (majors.length) majorSel.value = majors[0];
+    credSel.value = '__ALL__';
+  }
+
+  async function render() {
+    const majorSel = document.getElementById('major');
+    const credSel  = document.getElementById('cred');
+    
+    const m = majorSel.value;
+    const credVal = credSel.value;
+    
+    const majorPayloads = await getMajorData(m);
+    const payload = (majorPayloads || {})[credVal === '__ALL__' ? '__ALL__' : Number(credVal)] || null;
+
+    if (!payload) {
+      document.getElementById('stat-debt').innerText = 'N/A';
+      document.getElementById('stat-rpy').innerText = 'N/A';
+      document.getElementById('stat-earn').innerText = 'N/A';
+      Plotly.newPlot('chart', [], {title: 'No data for this selection'});
+      return;
+    }
+
+    // Update Cards
+    document.getElementById('stat-debt').innerText = payload.debt_mdn ? '$' + payload.debt_mdn.toLocaleString() : 'N/A';
+    document.getElementById('stat-rpy').innerText = payload.rpy_3yr_rt ? (payload.rpy_3yr_rt * 100).toFixed(1) + '%' : 'N/A';
+    document.getElementById('stat-earn').innerText = (payload.earn_pcts && payload.earn_pcts.p50) ? '$' + payload.earn_pcts.p50.toLocaleString() : 'N/A';
+
+    // Update Chart
+    const bins = payload.earn_bins || [];
+    const p = payload.earn_pcts || {};
+    
+    if (bins.length === 0) {
+        Plotly.newPlot('chart', [], {title: 'No earnings distribution data'});
+        return;
+    }
+
+    const x0 = bins.map(b => b.x0);
+    const x1 = bins.map(b => b.x1);
+    const y  = bins.map(b => b.count);
+    const widths = x1.map((v,i) => Math.max((v - x0[i]), 1e-6));
+    const ymax = Math.max(...y, 1);
+
+    const barTrace = {
+      type: 'bar',
+      x: x0,
+      y: y,
+      width: widths,
+      marker: {color: 'rgba(31,120,180,0.85)'},
+      hovertemplate: 'Range: %{x:.0f} – %{customdata:.0f}<br>Count: %{y}<extra></extra>',
+      customdata: x1
+    };
+
+    const pctDefs = [
+      {k:'p10', color:'#888', dash:'dot'},
+      {k:'p25', color:'#888', dash:'dot'},
+      {k:'p50', color:'crimson', dash:'solid'},
+      {k:'p75', color:'#888', dash:'dot'},
+      {k:'p90', color:'#888', dash:'dot'},
+    ].filter(d => p[d.k] != null);
+
+    const shapes = pctDefs.map(d => ({
+      type:'line', x0:p[d.k], x1:p[d.k], y0:0, y1:ymax,
+      line:{color:d.color, width:2, dash:d.dash}
+    }));
+
+    const annotations = pctDefs.map(d => ({
+      x:p[d.k], y:ymax, xanchor:'left', yanchor:'bottom',
+      text:d.k, showarrow:false, font:{color:d.color}
+    }));
+
+    const layout = {
+      title: `${m} - Earnings Distribution`,
+      bargap: 0.01,
+      xaxis: {title:'Median Earnings ($)'},
+      yaxis: {title:'Number of Institutions'},
+      shapes, annotations,
+      margin: {l:60,r:20,t:60,b:60},
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)'
+    };
+
+    Plotly.newPlot('chart', [barTrace], layout, {displayModeBar:true, responsive:true});
+  }
+
+  document.getElementById('major').addEventListener('change', render);
+  document.getElementById('cred').addEventListener('change', render);
+
+  (async () => {
+    try {
+      await loadData();
+      populateSelectors();
+      render();
+    } catch (e) {
+      console.error(e);
+      document.getElementById('chart').innerHTML = '<div style="padding:20px;">Could not load data. Ensure "python scripts/generate_site_data.py" has been run and "docs/data.json" exists.</div>';
+    }
+  })();
+});
+</script>
+</body>
+</html>

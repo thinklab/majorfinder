@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About the Data - Major Finder</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        h1 { border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        code { background: #eee; padding: 2px 4px; border-radius: 4px; }
+        [data-theme="dark"] code { background: #333; }
+        .back-link { display: inline-block; margin-top: 20px; text-decoration: none; color: #007bff; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>About the Data & Process</h1>
+    
+    <p>This dashboard provides insights into college major outcomes using official U.S. government data.</p>
+
+    <h3>Data Sources</h3>
+    <ul>
+        <li><strong>College Scorecard:</strong> Primary source for earnings, debt, and repayment data.</li>
+        <li><strong>IPEDS:</strong> Supplemental institutional information.</li>
+    </ul>
+
+    <h3>How It Is Processed</h3>
+    <ol>
+        <li><strong>Cleaning:</strong> Raw data is filtered for relevance and CIP codes (major identifiers) are normalized.</li>
+        <li><strong>Merging:</strong> Major-specific data is combined with institution-wide metrics.</li>
+        <li><strong>Aggregation:</strong> We calculate distributions of earnings across institutions and compute median debt and repayment rates for each major.</li>
+        <li><strong>Visualization:</strong> The processed data is served as a JSON file and rendered using Plotly.js.</li>
+    </ol>
+
+    <p><em>Note: Data represents cohorts from recent years as provided by the Department of Education.</em></p>
+
+    <a href="index.html" class="back-link">← Back to Dashboard</a>
+</body>
+</html>
