@@ -7,6 +7,7 @@ This project analyzes U.S. Department of Education (College Scorecard, IPEDS) da
 The project utilizes data from the [College Scorecard](https://collegescorecard.ed.gov/data):
 - **Institution-Level Data**: (`cohorts_institutions.csv`) Provides metrics such as repayment rates and overall institution stats.
 - **Field of Study Data**: (`recent-cohorts-filed.csv`) Provides major-specific outcomes including median earnings and debt.
+- **Last update** November 17, 2025.
 
 ## Data Processing Pipeline
 
