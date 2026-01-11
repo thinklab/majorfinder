@@ -25,7 +25,10 @@
   <h1>College Major Outcomes Dashboard</h1>
   
   <div class="row">
-    <label>Select Major:
+    <label>Select Major Group:
+      <select id="major-group"></select>
+    </label>
+    <label>Select Subgroup Major:
       <select id="major"></select>
     </label>
     <label>Degree Level (CREDLEV):
@@ -73,22 +76,53 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function populateSelectors() {
+    const groupSel = document.getElementById('major-group');
     const majorSel = document.getElementById('major');
     const credSel  = document.getElementById('cred');
+
+    groupSel.innerHTML = '';
     majorSel.innerHTML = '';
     credSel.innerHTML = '<option value="__ALL__">All Levels</option>';
 
-    const majors = Array.isArray(DATA.majors) ? DATA.majors : [];
-    const credlevs = Array.isArray(DATA.credlevs) ? DATA.credlevs : [];
+    const groups = DATA.groups || {};
+    const groupNames = Object.keys(groups);
 
-    majors.forEach(m => {
+    groupNames.forEach(g => {
       const o = document.createElement('option');
-      o.value = m; o.text = m;
-      majorSel.add(o);
+      o.value = g; o.text = g;
+      groupSel.add(o);
     });
 
-    credlevs.forEach(c => {
-      const o = document.createElement('option');
+    function updateMajors() {
+      const group = groupSel.value;
+      const majors = groups[group] || [];
+      majorSel.innerHTML = '<option value="__GROUP_SUMMARY__">-- Summary (All in Group) --</option>';
+      majors.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.text = m;
+        majorSel.add(o);
+      });
+      updateCreds();
+    }
+
+    function updateCreds() {
+      const groupName = groupSel.value;
+      const mName = majorSel.value;
+      
+      let mData;
+      if (mName === '__GROUP_SUMMARY__') {
+        mData = (DATA.group_payloads || {})[groupName] || {};
+      } else {
+        mData = DATA.payload[mName] || {};
+      }
+      
+      const currentCred = credSel.value;
+      
+      credSel.innerHTML = '<option value="__ALL__">All Levels</option>';
+      
+      // Cred levels are numbers in the payload keys
+      const availableCreds = Object.keys(mData).filter(k => k !== '__ALL__');
+      
       const names = {
         1: 'Undergraduate Certificate',
         2: 'Associate\'s Degree',
@@ -99,23 +133,52 @@ document.addEventListener('DOMContentLoaded', () => {
         7: 'First Professional Degree',
         8: 'Graduate/Professional Certificate'
       };
-      o.value = String(c);
-      o.text = names[c] ? `${names[c]} (Level ${c})` : `Level ${c}`;
-      credSel.add(o);
-    });
 
-    if (majors.length) majorSel.value = majors[0];
-    credSel.value = '__ALL__';
+      availableCreds.sort((a,b) => Number(a) - Number(b)).forEach(c => {
+        const o = document.createElement('option');
+        o.value = String(c);
+        o.text = names[c] ? `${names[c]} (Level ${c})` : `Level ${c}`;
+        credSel.add(o);
+      });
+
+      if (availableCreds.includes(currentCred)) {
+        credSel.value = currentCred;
+      } else {
+        credSel.value = '__ALL__';
+      }
+      updateChart();
+    }
+
+    function updateChart() {
+      render();
+    }
+
+    groupSel.onchange = updateMajors;
+    majorSel.onchange = updateCreds;
+    credSel.onchange = updateChart;
+
+    if (groupNames.length) {
+      groupSel.value = groupNames[0];
+      updateMajors();
+    }
   }
 
   async function render() {
+    const groupSel = document.getElementById('major-group');
     const majorSel = document.getElementById('major');
     const credSel  = document.getElementById('cred');
     
+    const g = groupSel.value;
     const m = majorSel.value;
     const credVal = credSel.value;
     
-    const majorPayloads = await getMajorData(m);
+    let majorPayloads;
+    if (m === '__GROUP_SUMMARY__') {
+      majorPayloads = (DATA.group_payloads || {})[g] || null;
+    } else {
+      majorPayloads = DATA.payload[m] || null;
+    }
+    
     const payload = (majorPayloads || {})[credVal === '__ALL__' ? '__ALL__' : Number(credVal)] || null;
 
     if (!payload) {
@@ -175,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }));
 
     const layout = {
-      title: `${m} - Earnings Distribution`,
+      title: `${m === '__GROUP_SUMMARY__' ? g + ' (Group Summary)' : m} - Earnings Distribution`,
       bargap: 0.01,
       xaxis: {title:'Median Earnings ($)'},
       yaxis: {title:'Number of Institutions'},

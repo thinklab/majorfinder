@@ -4,6 +4,50 @@ import pandas as pd
 import numpy as np
 
 
+CIP_GROUPS = {
+    "01": "Agriculture",
+    "03": "Natural Resources",
+    "04": "Architecture",
+    "05": "Area/Ethnic/Gender Studies",
+    "09": "Communication/Journalism",
+    "10": "Communications Technologies",
+    "11": "Computer Sciences",
+    "12": "Personal/Culinary Services",
+    "13": "Education",
+    "14": "Engineering",
+    "15": "Engineering Technologies",
+    "16": "Foreign Languages",
+    "19": "Family/Consumer Sciences",
+    "22": "Legal Professions",
+    "23": "English Language/Literature",
+    "24": "Liberal Arts/Humanities",
+    "25": "Library Science",
+    "26": "Biological/Biomedical Sciences",
+    "27": "Mathematics/Statistics",
+    "28": "Military Science",
+    "29": "Military Technologies",
+    "30": "Multi/Interdisciplinary Studies",
+    "31": "Parks/Recreation/Leisure/Fitness",
+    "38": "Philosophy/Religion",
+    "39": "Theology/Religious Vocations",
+    "40": "Physical Sciences",
+    "41": "Science Technologies",
+    "42": "Psychology",
+    "43": "Homeland Security/Law Enforcement",
+    "44": "Public Administration/Social Service",
+    "45": "Social Sciences",
+    "46": "Construction Trades",
+    "47": "Mechanic/Repair Technologies",
+    "48": "Precision Production",
+    "49": "Transportation/Materials Moving",
+    "50": "Visual and Performing Arts",
+    "51": "Health Professions",
+    "52": "Business/Marketing",
+    "54": "History",
+    "60": "Residency Programs",
+}
+
+
 def to_payload(df_slice, bins=50):
     if df_slice.empty:
         return None
@@ -69,12 +113,18 @@ def generate_data(full_data=False):
             os.remove(os.path.join(data_dir, f))
 
     valid_majors = []
+    major_to_group = {}
     valid_creds = set()
     all_payloads = {}
 
     for m in majors_all:
         m_slice = df[df["CIPDESC"] == m]
         m_payloads = {}
+
+        # Determine group
+        cip_code = m_slice["CIPCODE"].iloc[0]
+        cip2 = f"{int(cip_code):04d}"[:2]
+        group_name = CIP_GROUPS.get(cip2, "Other")
 
         p_all = to_payload(m_slice)
         if p_all:
@@ -90,8 +140,39 @@ def generate_data(full_data=False):
         if m_payloads:
             valid_majors.append(m)
             all_payloads[m] = m_payloads
+            major_to_group[m] = group_name
+
+    # Build grouped structure and group payloads
+    groups = {}
+    group_payloads = {}
+    for g, ms in sorted(major_to_group.items()):  # Wait, major_to_group is major: group
+        pass
+
+    # Correct way to iterate groups
+    unique_groups = sorted(set(major_to_group.values()))
+    for g in unique_groups:
+        ms_in_group = [m for m, grp in major_to_group.items() if grp == g]
+        groups[g] = sorted(ms_in_group)
+
+        # Calculate group-level payload
+        g_slice = df[df["CIPDESC"].isin(ms_in_group)]
+        g_payloads = {}
+        p_all = to_payload(g_slice)
+        if p_all:
+            g_payloads["__ALL__"] = p_all
+
+        for c in credlevs_all:
+            c_slice = g_slice[g_slice["CREDLEV"] == c]
+            p_c = to_payload(c_slice)
+            if p_c:
+                g_payloads[int(c)] = p_c
+
+        if g_payloads:
+            group_payloads[g] = g_payloads
 
     final_data = {
+        "groups": groups,
+        "group_payloads": group_payloads,
         "majors": sorted(valid_majors),
         "credlevs": sorted(list(valid_creds)),
         "payload": all_payloads,
