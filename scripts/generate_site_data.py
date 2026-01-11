@@ -57,26 +57,31 @@ def to_payload(df_slice, bins=50):
     rpy = pd.to_numeric(df_slice["RPY_3YR_RT"], errors="coerce").dropna()
 
     # If we don't have the primary outcomes, skip this slice to avoid N/A in dashboard
-    if earn.empty or debt.empty or rpy.empty:
+    if earn.empty and debt.empty and rpy.empty:
         return None
 
     payload = {}
 
-    counts, edges = np.histogram(earn.values, bins=bins)
-    payload["earn_bins"] = [
-        {
-            "x0": round(float(edges[i]), 2),
-            "x1": round(float(edges[i + 1]), 2),
-            "count": int(counts[i]),
+    if not earn.empty:
+        counts, edges = np.histogram(earn.values, bins=bins)
+        payload["earn_bins"] = [
+            {
+                "x0": round(float(edges[i]), 2),
+                "x1": round(float(edges[i + 1]), 2),
+                "count": int(counts[i]),
+            }
+            for i in range(len(counts))
+        ]
+        payload["earn_pcts"] = {
+            f"p{k}": round(float(np.percentile(earn.values, k)), 2)
+            for k in (10, 25, 50, 75, 90)
         }
-        for i in range(len(counts))
-    ]
-    payload["earn_pcts"] = {
-        f"p{k}": round(float(np.percentile(earn.values, k)), 2)
-        for k in (10, 25, 50, 75, 90)
-    }
-    payload["debt_mdn"] = round(float(debt.median()), 2)
-    payload["rpy_3yr_rt"] = round(float(rpy.mean()), 4)
+
+    if not debt.empty:
+        payload["debt_mdn"] = round(float(debt.median()), 2)
+
+    if not rpy.empty:
+        payload["rpy_3yr_rt"] = round(float(rpy.mean()), 4)
 
     return payload
 
